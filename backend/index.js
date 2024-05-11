@@ -10,9 +10,18 @@ const path = require('path');
 app.use(express.json());
 app.use(cors());
 
-//Database connection with mongodb
-mongoose.connect('')
+// Database connection with MongoDB
+mongoose.connect('mongodb+srv://murthy:9976173141@cluster0.q68rwxv.mongodb.net/E-com', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
+// Check MongoDB connection status
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'MongoDB connection error:'));
+db.once('open', () => {
+  console.log('Connected to MongoDB');
+});
 
 //Api Creation
 
@@ -231,31 +240,106 @@ const fetchUser = async (req,res,next)=>{
 
 // creating endpoint for adding products in cartdata
 
-app.post('/addtocart',fetchUser,async(req,res)=>{
-    console.log("Added",req.body.itemId);
-  let userData = await Users.findOne({_id:req.user.id});
-  userData.cartData[req.body.itemId] += 1;
-  await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData})
-  res.send("Added")
-})
+// app.post('/addtocart',fetchUser,async(req,res)=>{
+//     console.log("Added",req.body.itemId);
+//   let userData = await Users.findOne({_id:req.user.id});
+//   userData.cartData[req.body.itemId] += 1;
+//   await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData})
+//   res.send("Added")
+// })
+
+app.post('/addtocart', fetchUser, async (req, res) => {
+    console.log("Added", req.body.itemId);
+    try {
+        let userData = await Users.findOne({ _id: req.user.id });
+        if (!userData) {
+            return res.status(404).send("User not found");
+        }
+        if (!userData.cartData) {
+            userData.cartData = {};
+        }
+        if (!userData.cartData[req.body.itemId]) {
+            userData.cartData[req.body.itemId] = 0;
+        }
+
+        userData.cartData[req.body.itemId] += 1;
+        await Users.findOneAndUpdate({ _id: req.user.id }, { cartData: userData.cartData });
+        res.send("Added");
+    } catch (error) {
+        console.error("Error:", error);
+        res.status(500).send("Internal Server Error");
+    }
+});
+
 
 //Creating endpoint to remove product
 
-app.post('/removefromcart',fetchUser,async (req,res)=>{
-    console.log("removed",req.body.itemId);
-    let userData = await Users.findOne({_id:req.user.id});
-    if(userData.cartData[req.body.itemId]>0)
-    userData.cartData[req.body.itemId] -= 1;
-    await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData})
-    res.send("Removed")
-})
+// app.post('/removefromcart',fetchUser,async (req,res)=>{
+//     console.log("removed",req.body.itemId);
+//     let userData = await Users.findOne({_id:req.user.id});
+//     if(userData.cartData[req.body.itemId]>0)
+//     userData.cartData[req.body.itemId] -= 1;
+//     await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData})
+//     res.send("Removed")
+// })
+
+app.post('/removefromcart', fetchUser, async (req, res) => {
+    console.log("Removed", req.body.itemId);
+    try {
+        let userData = await Users.findOne({ _id: req.user.id });
+        if (!userData) {
+            return res.status(404).send("User not found");
+        }
+        if (!userData.cartData) {
+            userData.cartData = {};
+        }
+        if (!userData.cartData[req.body.itemId]) {
+            userData.cartData[req.body.itemId] = 0;
+        }
+        if (userData.cartData[req.body.itemId] > 0) {
+            userData.cartData[req.body.itemId] -= 1;
+        }
+
+        await Users.findOneAndUpdate({ _id: req.user.id }, { cartData: userData.cartData });
+        res.send("Removed");
+    } catch (error) {
+        console.error("Error:", error);
+        res.status(500).send("Internal Server Error");
+    }
+});
+
 
 //creating endpoint to get cartdata
-app.post('/getdata',fetchUser,async(req,res)=>{
+// app.post('/getdata',fetchUser,async(req,res)=>{
+//     console.log("GetCart");
+//     let userData = await Users.findOne({_id:req.user.id});
+//     res.json(userData.cartData);
+// })
+
+app.post('/getdata', fetchUser, async (req, res) => {
     console.log("GetCart");
-    let userData = await Users.findOne({_id:req.user.id});
-    res.json(userData.cartData);
-})
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+
+        let userData = await Users.findOne({ _id: req.user.id });
+
+        if (!userData) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        if (!userData.cartData) {
+            return res.status(200).json({ cartData: {} }); // Return empty cart data
+        }
+        
+        res.status(200).json({ cartData: userData.cartData });
+    } catch (error) {
+        console.error("Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
 
 app.listen(port,(error)=>{
     if(!error){
